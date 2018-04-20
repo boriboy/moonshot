@@ -9,13 +9,23 @@
 </style>
 
 <div class="example-wrapper">
-    <h1>Login as {{userType}}</h1>
+    <h1>Register as {{userType}}</h1>
 
-    <form action="/login" method="POST">
+    {{ form_start(form) }}
+        {{ form_row(form.username) }}
+        {{ form_row(form.email) }}
+        {{ form_row(form.plainPassword.first) }}
+        {{ form_row(form.plainPassword.second) }}
+
+        <input type="hidden" name="_target_path" value="/user/home" />
+        <button type="submit">Register!</button>
+    {{ form_end(form) }}
+
+    {# <form action="/login" method="POST">
         <input placeholder="username" type="text" name="username"/>
         <input placeholder="password" type="password" name="password"/>
         <input type="submit" name="submit" value="submit"/>
         <input type="hidden" name="type" value="{{userType}}"/>
-    </form>
+    </form> #}
 </div>
 {% endblock %}

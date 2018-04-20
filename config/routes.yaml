@@ -4,4 +4,4 @@
 
 #index:
 #    path: /login
-#    controller: App\Controller\AuthController::loginPage
+#    controller: App\Controller\AuthController::authOrHome

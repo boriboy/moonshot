@@ -2,55 +2,105 @@
 
 namespace App\Controller;
 
-use Symfony\Component\Routing\Annotation\Route;
+// misc
+use App\Form\UserType;
+use App\Entity\User;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
+
+// authentication
+use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
+
+// session
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
 
 class AuthController extends BaseController
 {
-    const USER = 'user';
-    const AGENT = 'agent';
+    
 
     /**
-     * @Route("/", name="auth")
+     * Returns login page rendered html or home page for authenticated users
+     * @Route("/", name="loginOrHome")
      */
-    public function index()
-    {
-        return $this->render('auth/index.html.twig');
-    }
-
-    /**
-     * Returns login page rendered html
-     * @Route("/login", methods="GET", name="login_page")
-     */
-    public function loginPage(Request $request) {
+    public function authOrHome(SessionInterface $session, Request $request) {
         // todo check if already in active session
 
-        // return rendered login page
-        return $this->render('auth/login.html.twig');
+        // authenticated users will be redirected to home
+        $user = $this->getUser();
+        if ($this->getUser() instanceof User) {
+            return $this->render('user/home.html.twig', ['userName' => $user->getUsername()]);
+        }
+        
+        // anonymus users get login page
+        return $this->render('index.html.twig');
     }
 
     /**
-     * Register action, redirect to user page on success
-     * @Route("/register/{type}", methods="GET", name="login")
+     * @Route("/login", name="login")
      */
-    public function registerPage(Request $request, string $type) {
-        // if not valid route throw exception
-        $this->enforceRouteParams($type, [self::USER, self::AGENT]);
+    public function login(Request $request, AuthenticationUtils $authenticationUtils)
+    {
+        // get the login error if there is one
+        $error = $authenticationUtils->getLastAuthenticationError();
 
-        // return rendered login page
-        return $this->render('auth/login.html.twig', [
-            'userType' => $type,
+        // last username entered by the user
+        $lastUsername = $authenticationUtils->getLastUsername();
+
+        return $this->render('auth/login.html.twig', array(
+            'last_username' => $lastUsername,
+            'error'         => $error,
+        ));
+    }
+
+    /**
+     * @Route("/register/{type}", name="user_registration")
+     */
+    public function registerAction(Request $request, UserPasswordEncoderInterface $passwordEncoder, string $type) {
+        // if not valid route throw exception
+        $this->enforceRouteParams($type, [User::USER_TYPE_USER, User::USER_TYPE_AGENT]);
+
+        // 1) build the form
+        $user = new User();
+        $form = $this->createForm(UserType::class, $user);
+
+        // 2) handle the submit (will only happen on POST)
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+
+            // 3) Encode the password (you could also do this via Doctrine listener)
+            $password = $passwordEncoder->encodePassword($user, $user->getPlainPassword());
+            $user->setPassword($password);
+            $user->setCreatedAt(new \DateTime());
+            $user->setRole(User::resolveDefaultRoleForType($type));
+
+            // 4) save the User!
+            $entityManager = $this->getDoctrine()->getManager();
+            $entityManager->persist($user);
+            $entityManager->flush();
+
+            // ... do any other work - like sending them an email, etc
+            // maybe set a "flash" success message for the user
+
+            return $this->redirectToRoute('loginOrHome');
+        }
+
+        return $this->render(
+            'auth/register.html.twig', [
+                'form' => $form->createView(),
+                'userType' => $type
+            ]
+        );
+    }
+
+    /**
+     * @Route("/user/home", name="home")
+     */
+    public function home(Request $request) {
+        print_r($this->getUser()->getEmail());
+        return $this->render('user/home.html.twig', [
+            'userName' => $request->getUser()
         ]);
     }
-
-    /**
-     * Login action, redirect to user page on success
-     * @Route("/login", methods="POST", name="login")
-     */
-    public function login(Request $request) {
-
-    }
-
-
 }
